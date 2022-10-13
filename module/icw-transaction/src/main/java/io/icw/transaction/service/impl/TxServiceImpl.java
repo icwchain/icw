@@ -1452,7 +1452,7 @@ public class TxServiceImpl implements TxService {
             } catch (NulsException e) {
             	chain.getLogger().error(BaseConstant.TX_VALIDATOR + ":" + moduleCode + ":" + moduleList + ":" + txHashList, e);
                 chain.getLogger().error("Package module verify failed -txModuleValidator Exception:{}, module-code:{}, count:{} , return count:{}",
-                        BaseConstant.TX_VALIDATOR, moduleCode, moduleList.size(), txHashList.size());
+                        BaseConstant.TX_VALIDATOR, moduleCode, moduleList.size(), 0);
                 //出错则删掉整个模块的交易
                 Iterator<TxPackageWrapper> its = packingTxList.iterator();
                 while (its.hasNext()) {
