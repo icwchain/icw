@@ -269,40 +269,44 @@ public class MongoAgentServiceImpl implements AgentService {
         
         List<Document> docsList = null;
         List<PocRoundItem> itemList = null;
-        if (order == 0 || order == 1) {
-        	ApiCache apiCache = CacheManager.getCache(chainId);
-        	itemList = apiCache.getCurrentRound().getItemList();
-        	List<String> packingAddress = new ArrayList<String>();
-        	for (PocRoundItem item : itemList) {
-        		packingAddress.add(item.getPackingAddress());
-        	}
-        	if (itemList.size() > 15) {
-        		docsList = this.mongoDBService.pageQuery(AGENT_TABLE + chainId, filter, sorts, pageNumber, pageSize);
-        	} else {
-	        	if (!packingAddress.isEmpty()) {
-	        		if (pageNumber == 1) {
-	        			Bson filterIn = Filters.and(filter, Filters.in("packingAddress", packingAddress));
-	        			docsList = this.mongoDBService.pageQuery(AGENT_TABLE + chainId, filterIn, sorts, pageNumber, pageSize);
-	        			Bson filterNin = Filters.and(filter, Filters.nin("packingAddress", packingAddress));
-	        			List<Document> docsList2 = this.mongoDBService.pageQuery(AGENT_TABLE + chainId, filterNin, sorts, pageNumber, pageSize - itemList.size());
-	        			docsList.addAll(docsList2);
-	        		} else {
-	        			Bson filterNin = Filters.and(filter, Filters.nin("packingAddress", packingAddress));
-	        			docsList = this.mongoDBService.pageQuery(AGENT_TABLE + chainId, filterNin, sorts, pageNumber, pageSize, itemList.size());
-	        		}
+        if (StringUtils.isNotBlank(keyword)) {
+        	docsList = this.mongoDBService.pageQuery(AGENT_TABLE + chainId, filter, sorts, pageNumber, pageSize);
+        } else {
+	        if (order == 0 || order == 1) {
+	        	ApiCache apiCache = CacheManager.getCache(chainId);
+	        	itemList = apiCache.getCurrentRound().getItemList();
+	        	List<String> packingAddress = new ArrayList<String>();
+	        	for (PocRoundItem item : itemList) {
+	        		packingAddress.add(item.getPackingAddress());
 	        	}
-        	}
-        } else if (order == 2) {
-        	sorts = Sorts.descending("commissionRate");
-        	docsList = this.mongoDBService.pageQuery(AGENT_TABLE + chainId, filter, sorts, pageNumber, pageSize);
-        } else if (order == 3) {
-        	sorts = Sorts.descending("totalDeposit", "createTime");
-        	docsList = this.mongoDBService.pageQuery(AGENT_TABLE + chainId, filter, sorts, pageNumber, pageSize);
-        } else if (order == 4) {
-        	sorts = Sorts.descending("deposit", "createTime");
-        	docsList = this.mongoDBService.pageQuery(AGENT_TABLE + chainId, filter, sorts, pageNumber, pageSize);
+	        	if (itemList.size() > 15) {
+	        		docsList = this.mongoDBService.pageQuery(AGENT_TABLE + chainId, filter, sorts, pageNumber, pageSize);
+	        	} else {
+		        	if (!packingAddress.isEmpty()) {
+		        		if (pageNumber == 1) {
+		        			Bson filterIn = Filters.and(filter, Filters.in("packingAddress", packingAddress));
+		        			docsList = this.mongoDBService.pageQuery(AGENT_TABLE + chainId, filterIn, sorts, pageNumber, pageSize);
+		        			Bson filterNin = Filters.and(filter, Filters.nin("packingAddress", packingAddress));
+		        			List<Document> docsList2 = this.mongoDBService.pageQuery(AGENT_TABLE + chainId, filterNin, sorts, pageNumber, pageSize - itemList.size());
+		        			docsList.addAll(docsList2);
+		        		} else {
+		        			Bson filterNin = Filters.and(filter, Filters.nin("packingAddress", packingAddress));
+		        			docsList = this.mongoDBService.pageQuery(AGENT_TABLE + chainId, filterNin, sorts, pageNumber, pageSize, itemList.size());
+		        		}
+		        	}
+	        	}
+	        } else if (order == 2) {
+	        	sorts = Sorts.descending("commissionRate");
+	        	docsList = this.mongoDBService.pageQuery(AGENT_TABLE + chainId, filter, sorts, pageNumber, pageSize);
+	        } else if (order == 3) {
+	        	sorts = Sorts.descending("totalDeposit", "createTime");
+	        	docsList = this.mongoDBService.pageQuery(AGENT_TABLE + chainId, filter, sorts, pageNumber, pageSize);
+	        } else if (order == 4) {
+	        	sorts = Sorts.descending("deposit", "createTime");
+	        	docsList = this.mongoDBService.pageQuery(AGENT_TABLE + chainId, filter, sorts, pageNumber, pageSize);
+	        }
         }
-        
+	        
         LoggerUtil.commonLog.info(String.valueOf(System.currentTimeMillis() - start));
         
         List<AgentInfo> agentInfoList = new ArrayList<>();
