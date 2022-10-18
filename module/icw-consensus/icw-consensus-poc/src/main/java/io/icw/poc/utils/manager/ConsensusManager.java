@@ -13,6 +13,7 @@ import io.icw.core.core.annotation.Autowired;
 import io.icw.core.core.annotation.Component;
 import io.icw.core.exception.NulsException;
 import io.icw.core.exception.NulsRuntimeException;
+import io.icw.core.log.Log;
 import io.icw.economic.base.service.EconomicService;
 import io.icw.economic.nuls.constant.ParamConstant;
 import io.icw.economic.nuls.model.bo.AgentInfo;
@@ -24,9 +25,12 @@ import io.icw.poc.model.bo.BlockData;
 import io.icw.poc.model.bo.Chain;
 import io.icw.poc.model.bo.ChargeResultData;
 import io.icw.poc.rpc.call.CallMethodUtils;
+import io.icw.poc.utils.compare.AgentComparator;
+
 import java.io.IOException;
 import java.math.BigInteger;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -350,7 +354,7 @@ public class ConsensusManager {
     private List<CoinTo> getRewardCoin(MeetingMember self, MeetingRound localRound, long unlockHeight,Map<String, BigInteger> awardAssetMap, Chain chain)throws NulsException{
         Map<String,Object> param = new HashMap<>(4);
 
-        RoundInfo roundInfo = new RoundInfo(localRound.getTotalWeight(),localRound.getStartTime(),localRound.getEndTime(),localRound.getMemberCount());
+        RoundInfo roundInfo = new RoundInfo(localRound.getIndex(),localRound.getTotalWeight(),localRound.getStartTime(),localRound.getEndTime(),localRound.getMemberCount());
 
         List<DepositInfo> depositList = new ArrayList<>();
         for (Deposit deposit : self.getDepositList()) {
@@ -374,62 +378,194 @@ public class ConsensusManager {
         return (List<CoinTo>) ((Map<String,Object>) result.getData()).get("coinToList");
     }
 
+    public BlockHeader getFirstBlockOfPreRound(Chain chain, long roundIndex) {
+        BlockHeader firstBlockHeader = null;
+        long startRoundIndex = 0L;
+        List<BlockHeader> blockHeaderList = chain.getBlockHeaderList();
+        for (int i = blockHeaderList.size() - 1; i >= 0; i--) {
+            BlockHeader blockHeader = blockHeaderList.get(i);
+            long currentRoundIndex = blockHeader.getExtendsData().getRoundIndex();
+            if (roundIndex > currentRoundIndex) {
+                if (startRoundIndex == 0L) {
+                    startRoundIndex = currentRoundIndex;
+                }
+                if (currentRoundIndex < startRoundIndex) {
+                    firstBlockHeader = blockHeaderList.get(i + 1);
+                    BlockExtendsData roundData = firstBlockHeader.getExtendsData();
+                    if (roundData.getPackingIndexOfRound() > 1) {
+                        firstBlockHeader = blockHeader;
+                    }
+                    break;
+                }
+            }
+        }
+        if (firstBlockHeader == null) {
+            firstBlockHeader = chain.getNewestHeader();
+            chain.getLogger().warn("the first block of pre round not found");
+        }
+        return firstBlockHeader;
+    }
+    
+    private List<Agent> getAliveAgentList(Chain chain, long startBlockHeight) {
+        List<Agent> agentList = chain.getAgentList();
+        List<Agent> resultList = new ArrayList<>();
+        for (int i = agentList.size() - 1; i >= 0; i--) {
+            Agent agent = agentList.get(i);
+            if (agent.getDelHeight() != -1L && agent.getDelHeight() <= startBlockHeight) {
+                continue;
+            }
+            if (agent.getBlockHeight() > startBlockHeight || agent.getBlockHeight() < 0L) {
+                continue;
+            }
+            resultList.add(agent);
+        }
+        return resultList;
+    }
+    
+    private List<Deposit> getDepositListByAgentId(Chain chain, NulsHash agentHash, long startBlockHeight) {
+        List<Deposit> depositList = chain.getDepositList();
+        List<Deposit> resultList = new ArrayList<>();
+        for (int i = depositList.size() - 1; i >= 0; i--) {
+            Deposit deposit = depositList.get(i);
+            if (deposit.getDelHeight() != -1L && deposit.getDelHeight() <= startBlockHeight) {
+                continue;
+            }
+            if (deposit.getBlockHeight() > startBlockHeight || deposit.getBlockHeight() < 0L) {
+                continue;
+            }
+            if (!deposit.getAgentHash().equals(agentHash)) {
+                continue;
+            }
+            resultList.add(deposit);
+        }
+        return resultList;
+    }
+    
     @SuppressWarnings("unchecked")
     private List<CoinTo> getRewardCoin2(Chain chain, MeetingRound localRound, long unlockHeight, BlockExtendsData extendsData)throws Exception{
-//    	chain.getLogger().info("getRewardCoin2 start:" + System.currentTimeMillis());
-        Map<String,Object> param = new HashMap<>(4);
-
-        RoundInfo roundInfo = new RoundInfo(localRound.getTotalWeight(),localRound.getStartTime(),localRound.getEndTime(),localRound.getMemberCount());
-
-        MeetingRound allMeetingRound = roundManager.getRound(chain);
-        MeetingRound meetingRound = roundManager.getRound(chain, extendsData, true);
-        
-        List<MeetingMember> allMmembers = allMeetingRound.getMemberList();
-        List<MeetingMember> members = meetingRound.getMemberList();
-        List<MeetingMember> rewardMembers = new ArrayList<MeetingMember>();
-        
-        Map<String, MeetingMember> memberMap = new HashMap<String, MeetingMember>();
-        for (MeetingMember member : members) {
-        	memberMap.put(AddressTool.getStringAddressByBytes(member.getAgent().getPackingAddress()), member);
-    	}
-        
-        for (MeetingMember allMember : allMmembers) {
-        	if (!memberMap.containsKey(AddressTool.getStringAddressByBytes(allMember.getAgent().getPackingAddress()))) {
-        		rewardMembers.add(allMember);
-        	}
-        }
-        
-//        chain.getLogger().error("getRewardCoin2 : " + allMmembers.toString());
-//        chain.getLogger().error("getRewardCoin2 : " + members.toString());
-//        chain.getLogger().error("getRewardCoin2 : " + rewardMembers.toString());
-        
-        if (!rewardMembers.isEmpty()) {
+    	long index = localRound.getIndex() / 10;
+    	if (index < 250700L) {
+	        Map<String,Object> param = new HashMap<>(4);
+	
+	        RoundInfo roundInfo = new RoundInfo(localRound.getIndex(), localRound.getTotalWeight(),localRound.getStartTime(),localRound.getEndTime(),localRound.getMemberCount());
+	
+	        MeetingRound allMeetingRound = roundManager.getRound(chain);
+	        MeetingRound meetingRound = roundManager.getRound(chain, extendsData, true);
+	        
+	        List<MeetingMember> allMmembers = allMeetingRound.getMemberList();
+	        List<MeetingMember> members = meetingRound.getMemberList();
+	        List<MeetingMember> rewardMembers = new ArrayList<MeetingMember>();
+	        
+	        Map<String, MeetingMember> memberMap = new HashMap<String, MeetingMember>();
+	        for (MeetingMember member : members) {
+	        	memberMap.put(AddressTool.getStringAddressByBytes(member.getAgent().getPackingAddress()), member);
+	    	}
+	        
+	        for (MeetingMember allMember : allMmembers) {
+	        	if (!memberMap.containsKey(AddressTool.getStringAddressByBytes(allMember.getAgent().getPackingAddress()))) {
+	        		rewardMembers.add(allMember);
+	        	}
+	        }
+	        
+	        if (!rewardMembers.isEmpty()) {
+		        List<AgentInfo> agentInfos = new ArrayList<AgentInfo>();
+		        for (MeetingMember member : rewardMembers) {
+		        	Agent agent = member.getAgent();
+		        	List<DepositInfo> depositList = new ArrayList<>();
+		        	for (Deposit deposit : member.getDepositList()) {
+		                DepositInfo depositInfo = new DepositInfo(deposit.getDeposit(),deposit.getAddress());
+		                depositList.add(depositInfo);
+		            }
+		        	AgentInfo agentInfo = new AgentInfo(agent.getCommissionRate(),agent.getDeposit(),agent.getRewardAddress(),agent.getTotalDeposit(),agent.getCreditVal(),depositList);
+		        	agentInfos.add(agentInfo);
+		        }
+		
+		        param.put(ParamConstant.CHAIN_ID, chain.getConfig().getChainId());
+		        param.put(ParamConstant.ROUND_INFO, roundInfo);
+		        param.put(ParamConstant.AGENT_INFO, agentInfos);
+		
+		        Result result = economicService.calcReward2(param);
+		        if(result.isFailed()){
+		            chain.getLogger().error("Miscalculation of Consensus Reward");
+		            throw new NulsException(result.getErrorCode());
+		        }
+		        return (List<CoinTo>) ((Map<String,Object>) result.getData()).get("coinToList");
+	        } else {
+	        	return new ArrayList<CoinTo>();
+	        }
+    	} else {
+    		Map<String,Object> param = new HashMap<>(4);
+    		
+	        RoundInfo roundInfo = new RoundInfo(localRound.getIndex(), localRound.getTotalWeight(),localRound.getStartTime(),localRound.getEndTime(),localRound.getMemberCount());
+	        
+	        BlockHeader startBlockHeader = getFirstBlockOfPreRound(chain, localRound.getIndex());
+	        
+	        List<Agent> aliveAgentList = getAliveAgentList(chain, startBlockHeader.getHeight());
+	        List<Agent> agentList = new ArrayList<Agent>();
+	        for (Agent agent : aliveAgentList) {
+	        	agentList.add(agent);
+	        }
+	        
+	        Collections.sort(agentList, new AgentComparator());
+	        
 	        List<AgentInfo> agentInfos = new ArrayList<AgentInfo>();
-	        for (MeetingMember member : rewardMembers) {
-	        	Agent agent = member.getAgent();
-	        	List<DepositInfo> depositList = new ArrayList<>();
-	        	for (Deposit deposit : member.getDepositList()) {
+	        
+	        for (Agent agent : agentList) {
+	            Agent realAgent = new Agent();
+	            try {
+	                realAgent.parse(agent.serialize(), 0);
+	                realAgent.setTxHash(agent.getTxHash());
+	            } catch (IOException io) {
+	                Log.error(io);
+	            }
+	           
+	            /*
+	            获取节点委托信息，用于计算节点总的委托金额
+	            Get the node delegation information for calculating the total amount of the node delegation
+	            */
+	            List<Deposit> cdList = getDepositListByAgentId(chain, realAgent.getTxHash(), startBlockHeader.getHeight());
+	            BigInteger totalDeposit = BigInteger.ZERO;
+	            for (Deposit dtx : cdList) {
+	                totalDeposit = totalDeposit.add(dtx.getDeposit());
+	            }
+	            realAgent.setTotalDeposit(totalDeposit);
+	            agent.setTotalDeposit(totalDeposit);
+	            
+	            /*
+	            节点总的委托金额是否达到出块节点的最小值
+	            Does the total delegation amount of the node reach the minimum value of the block node?
+	            */
+	            boolean isItIn = realAgent.getTotalDeposit().compareTo(chain.getConfig().getCommissionMin()) >= 0 ? true : false;
+	            if (isItIn) {
+	                realAgent.setCreditVal(1.0);
+	            } else {
+	            	continue;
+	            }
+	            
+	            List<DepositInfo> depositList = new ArrayList<>();
+	        	for (Deposit deposit : cdList) {
 	                DepositInfo depositInfo = new DepositInfo(deposit.getDeposit(),deposit.getAddress());
 	                depositList.add(depositInfo);
 	            }
-	        	AgentInfo agentInfo = new AgentInfo(agent.getCommissionRate(),agent.getDeposit(),agent.getRewardAddress(),agent.getTotalDeposit(),agent.getCreditVal(),depositList);
+	        	AgentInfo agentInfo = new AgentInfo(realAgent.getCommissionRate(),realAgent.getDeposit(),realAgent.getRewardAddress(),realAgent.getTotalDeposit(),realAgent.getCreditVal(),depositList);
 	        	agentInfos.add(agentInfo);
 	        }
-	
-	        param.put(ParamConstant.CHAIN_ID, chain.getConfig().getChainId());
-	        param.put(ParamConstant.ROUND_INFO, roundInfo);
-	        param.put(ParamConstant.AGENT_INFO, agentInfos);
-	
-	        Result result = economicService.calcReward2(param);
-	        if(result.isFailed()){
-	            chain.getLogger().error("Miscalculation of Consensus Reward");
-	            throw new NulsException(result.getErrorCode());
+	        
+	        if (!agentInfos.isEmpty()) {
+		        param.put(ParamConstant.CHAIN_ID, chain.getConfig().getChainId());
+		        param.put(ParamConstant.ROUND_INFO, roundInfo);
+		        param.put(ParamConstant.AGENT_INFO, agentInfos);
+		
+		        Result result = economicService.calcReward2(param);
+		        if(result.isFailed()){
+		            chain.getLogger().error("Miscalculation of Consensus Reward");
+		            throw new NulsException(result.getErrorCode());
+		        }
+		        return (List<CoinTo>) ((Map<String,Object>) result.getData()).get("coinToList");
+	        } else {
+	        	return new ArrayList<CoinTo>();
 	        }
-//	        chain.getLogger().info("getRewardCoin2 end:" + System.currentTimeMillis());
-	        return (List<CoinTo>) ((Map<String,Object>) result.getData()).get("coinToList");
-        } else {
-        	return new ArrayList<CoinTo>();
-        }
+    	}
     }
     
     /**

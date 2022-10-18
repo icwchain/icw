@@ -55,9 +55,9 @@ public class ChainTools {
 	        Response cmdResp = ResponseMessageProcessor.requestAndResponse(ModuleE.CS.abbr, "cs_getAgentAddressList", params);
 //	        System.out.println(((Map)cmdResp.getResponseData()).get("cs_getAgentAddressList"));
 	        
-	        Map packerInfo = (Map)((Map) cmdResp.getResponseData()).get("cs_getAgentAddressList");
+	        addressMap = (Map)((Map) cmdResp.getResponseData()).get("cs_getAgentAddressList");
 //	        System.out.println("packerInfo" + packerInfo);
-	        
+//	        
 //	        System.out.println("address" + packerInfo.get("address"));
 //	        String address = (String)packerInfo.get("address");
 //	        String password = (String)packerInfo.get("password");

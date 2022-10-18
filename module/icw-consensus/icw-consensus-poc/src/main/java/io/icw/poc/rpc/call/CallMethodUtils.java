@@ -542,7 +542,7 @@ public class CallMethodUtils {
      * @param chain chain info
      */
     @SuppressWarnings("unchecked")
-    public static void loadBlockHeader(Chain chain)throws Exception{
+    public static boolean loadBlockHeader(Chain chain)throws Exception{
         Map params = new HashMap(ConsensusConstant.INIT_CAPACITY);
         params.put(Constants.CHAIN_ID, chain.getConfig().getChainId());
         params.put("round", ConsensusConstant.INIT_BLOCK_HEADER_COUNT);
@@ -573,8 +573,9 @@ public class CallMethodUtils {
         }
         blockHeaders.sort(new BlockHeaderComparator());
         chain.setBlockHeaderList(blockHeaders);
-        chain.setNewestHeader(blockHeaders.get(blockHeaders.size() - 1));
+        boolean register = chain.setNewestHeader(blockHeaders.get(blockHeaders.size() - 1));
         Log.debug("---------------------------区块加载成功！");
+        return register;
     }
 
 

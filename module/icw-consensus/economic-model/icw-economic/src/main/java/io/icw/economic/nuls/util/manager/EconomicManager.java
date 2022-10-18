@@ -91,10 +91,72 @@ public class EconomicManager {
         }
         return rewardList;
     }
+    
+    public static List<AgentInfo> getRewardAgents(List<AgentInfo> agentInfos, RoundInfo roundInfo) {
+//    	Log.info("-------------------------------------------------------------------------");
+//    	for (AgentInfo agent : agentInfos) {
+//    		Log.info(AddressTool.getStringAddressByBytes(agent.getRewardAddress()));
+//    	}
+//    	Log.info("-------------------------------------------------------------------------");
+    	long index = roundInfo.getIndex() / 10;
+    	if (index < 250700L) {
+    		return agentInfos;
+    	} else {
+	    	List<AgentInfo> agents = new ArrayList<AgentInfo>();
+	    	int groupCount = 50;
+	    	int size = agentInfos.size();
+	    	int mod  = size % groupCount;
+	    	int group = mod >= groupCount / 2 ? size / groupCount + 1 : size / groupCount;
+	    	
+	    	int currentGroup = (int)(index % group);
+	    	int begin = currentGroup * groupCount;
+	    	
+	    	int end = begin + groupCount;
+	    	if (currentGroup == group - 1) {
+	    		if (mod >= groupCount / 2) {
+	    			end =  begin + mod;
+	    		} else {
+	    			end =  end + mod;
+	    		}
+	    	}
+	    	
+	    	Log.info(index + " :: " + group + " :: " + currentGroup + " :: " + begin + " :: " + end);
+	    	
+//	    	Log.info("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
+	    	for (int i = begin; i < end; i++) {
+//	    		Log.info(AddressTool.getStringAddressByBytes(agentInfos.get(i).getRewardAddress()));
+	    		agents.add(agentInfos.get(i));
+	    	}
+//	    	Log.info("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
+	    	return agents;
+    	}
+    }
+    
+    public static void main(String[] args) {
+    	List<AgentInfo> agentInfos = new ArrayList<AgentInfo>();
+    	for (int i = 0; i < 1151; i++) {
+    		AgentInfo agent = new AgentInfo();
+    		agent.setTotalDeposit(BigInteger.valueOf(i));
+    		agentInfos.add(agent);
+    	}
+    	for (int j = 0; j < 12; j++) {
+	    	RoundInfo roundInfo = new RoundInfo();
+	    	roundInfo.setIndex(1000000080L + j * 10);
+	    	
+	    	System.out.println(j + " ::---------------------------------------------------");
+	    	
+	    	List<AgentInfo> agents = getRewardAgents(agentInfos, roundInfo);
+	    	for (int i = 0; i < agents.size(); i++) {
+	    		System.out.println(agents.get(i).getTotalDeposit());
+	    	}
+    	}
+    }
 
     public static List<CoinTo> getRewardCoin2(List<AgentInfo> agentInfos, RoundInfo roundInfo, ConsensusConfigInfo consensusConfig, long unlockHeight, Map<String, BigInteger> awardAssetMap)throws NulsException{
     	List<CoinTo> rewardList = new ArrayList<>();
-        
+    	
+    	agentInfos = getRewardAgents(agentInfos, roundInfo);
+    	
         double totalWeight = 0d;
         for(AgentInfo agentInfo : agentInfos) {
         	BigInteger selfAllDeposit = agentInfo.getDeposit().add(agentInfo.getTotalDeposit());
@@ -131,7 +193,6 @@ public class EconomicManager {
 	        BigDecimal agentWeight = DoubleUtils.mul(new BigDecimal(selfAllDeposit), agentInfo.getCreditVal());
 	        if (totalWeight > 0 && agentWeight.doubleValue() > 0) {
 	            BigInteger consensusReword = DoubleUtils.mul(totalAll, DoubleUtils.div(agentWeight, totalWeight)).toBigInteger();
-	            Log.info("");
 	            String assetKey = consensusConfig.getChainId() + NulsEconomicConstant.SEPARATOR + consensusConfig.getAwardAssetId();
 	            if(awardAssetMap.keySet().contains(assetKey)){
 	                awardAssetMap.put(assetKey, awardAssetMap.get(assetKey).add(consensusReword));

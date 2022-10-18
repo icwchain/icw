@@ -7,6 +7,7 @@ package io.icw.economic.nuls.model.bo;
  * 2019/7/23
  * */
 public class RoundInfo {
+	private long index;
     private double totalWeight;
     private long roundStartTime;
     private long roundEndTime;
@@ -14,7 +15,8 @@ public class RoundInfo {
 
     public RoundInfo(){}
 
-    public RoundInfo(double totalWeight,long roundStartTime,long roundEndTime,int memberCount){
+    public RoundInfo(long index, double totalWeight,long roundStartTime,long roundEndTime,int memberCount){
+    	this.index = index;
         this.totalWeight = totalWeight;
         this.roundStartTime = roundStartTime;
         this.roundEndTime = roundEndTime;
@@ -52,4 +54,12 @@ public class RoundInfo {
     public void setMemberCount(int memberCount) {
         this.memberCount = memberCount;
     }
+
+	public long getIndex() {
+		return index;
+	}
+
+	public void setIndex(long index) {
+		this.index = index;
+	}
 }

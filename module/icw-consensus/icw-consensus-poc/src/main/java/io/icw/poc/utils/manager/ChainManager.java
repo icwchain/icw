@@ -260,7 +260,16 @@ public class ChainManager {
      */
     private void initCache(Chain chain) {
         try {
-            CallMethodUtils.loadBlockHeader(chain);
+        	boolean register = CallMethodUtils.loadBlockHeader(chain);
+        	
+        	if (register) {
+            	Map<String,Object> param = new HashMap<>(4);
+                double deflationRatio = DoubleUtils.sub(ConsensusConstant.VALUE_OF_ONE_HUNDRED, chain.getConfig().getDeflationRatio());
+                param.put(ParamConstant.CONSENUS_CONFIG, new ConsensusConfigInfo(1, 1, chain.getConfig().getPackingInterval(),
+                		chain.getConfig().getInflationAmount(),chain.getConfig().getTotalInflationAmount(),chain.getConfig().getInitTime(),deflationRatio,chain.getConfig().getDeflationTimeInterval(),chain.getConfig().getAwardAssetId()));
+                economicService.registerConfig(param);
+            }
+        	
             agentManager.loadAgents(chain);
             depositManager.loadDeposits(chain);
             punishManager.loadPunishes(chain);

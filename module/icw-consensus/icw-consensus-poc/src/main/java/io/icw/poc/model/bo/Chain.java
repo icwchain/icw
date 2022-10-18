@@ -247,7 +247,7 @@ public class Chain {
 
     public ConfigBean getConfig() {
         return config;
-    }
+    } 
 
     public void setConfig(ConfigBean config) {
         this.config = config;
@@ -329,8 +329,20 @@ public class Chain {
         return newestHeader;
     }
 
-    public void setNewestHeader(BlockHeader newestHeader) {
-        this.newestHeader = newestHeader;
+    public boolean setNewestHeader(BlockHeader newestHeader) {
+    	this.newestHeader = newestHeader;
+		if(newestHeader.getHeight() >= 1677418L) {
+    		if (config.getPackingInterval() != 12) {
+    			config.setPackingInterval(12);
+    			return true;
+    		}
+    	} else {
+    		if (config.getPackingInterval() != 6) {
+    			config.setPackingInterval(6);
+    			return true;
+    		}
+    	}
+        return false;
     }
 
     public List<BlockHeader> getBlockHeaderList() {

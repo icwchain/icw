@@ -4,13 +4,19 @@ import io.icw.base.data.BlockExtendsData;
 import io.icw.base.data.BlockHeader;
 import io.icw.core.core.annotation.Autowired;
 import io.icw.core.core.annotation.Component;
+import io.icw.core.model.DoubleUtils;
+import io.icw.economic.base.service.EconomicService;
+import io.icw.economic.nuls.constant.ParamConstant;
+import io.icw.economic.nuls.model.bo.ConsensusConfigInfo;
 import io.icw.poc.constant.ConsensusConstant;
 import io.icw.poc.model.bo.Chain;
 import io.icw.poc.rpc.call.CallMethodUtils;
 import io.icw.poc.utils.compare.BlockHeaderComparator;
 
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 链区块管理类
@@ -27,6 +33,9 @@ public class BlockManager {
     @Autowired
     private PunishManager punishManager;
 
+    @Autowired
+    private EconomicService economicService;
+    
     /**
      * 收到最新区块头，更新链区块缓存数据
      * Receive the latest block header, update the chain block cache entity
@@ -60,7 +69,16 @@ public class BlockManager {
             }
         }
         chain.getBlockHeaderList().add(blockHeader);
-        chain.setNewestHeader(blockHeader);
+        boolean register = chain.setNewestHeader(blockHeader);
+        
+        if (register) {
+        	Map<String,Object> param = new HashMap<>(4);
+            double deflationRatio = DoubleUtils.sub(ConsensusConstant.VALUE_OF_ONE_HUNDRED, chain.getConfig().getDeflationRatio());
+            param.put(ParamConstant.CONSENUS_CONFIG, new ConsensusConfigInfo(1, 1, chain.getConfig().getPackingInterval(),
+            		chain.getConfig().getInflationAmount(),chain.getConfig().getTotalInflationAmount(),chain.getConfig().getInitTime(),deflationRatio,chain.getConfig().getDeflationTimeInterval(),chain.getConfig().getAwardAssetId()));
+            economicService.registerConfig(param);
+        }
+        
         chain.getLogger().info("区块保存，高度为：" + blockHeader.getHeight() + " , txCount: " + blockHeader.getTxCount() + ",本地最新区块高度为：" + chain.getNewestHeader().getHeight() + ", 轮次:" + receiveExtendsData.getRoundIndex());
         //清除已经缓存了的比本节点轮次大的轮次信息
         roundManager.clearRound(chain,receiveRoundIndex);

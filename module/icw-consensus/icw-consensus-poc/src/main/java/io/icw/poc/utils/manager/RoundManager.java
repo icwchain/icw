@@ -477,9 +477,15 @@ public class RoundManager {
         List<String> members = new ArrayList<String>();
 		try {
 			if (filter) {
+				
 				Map<String, Object> callParams = new HashMap<>(4);
 		        callParams.put("roundIndex", round.getIndex());
-		        callParams.put("blockHeight", endBlockHeader.getHeight());
+		        if (endBlockHeader.getHeight() >= 1677418L) {
+		        	callParams.put("blockHeight", endBlockHeader.getHeight());
+				} else {
+					callParams.put("blockHeight", startBlockHeader.getHeight());
+				}
+		        
 		        callParams.put("isRealTime", isRealTime); 
 				Response cmdResp = ResponseMessageProcessor.requestAndResponse("pow", "pow_roundMembers", callParams);
 				Log.info(cmdResp.getResponseErrorCode() 
