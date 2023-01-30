@@ -30,6 +30,7 @@ import io.icw.api.ApiContext;
 import io.icw.api.analysis.WalletRpcHandler;
 import io.icw.api.cache.ApiCache;
 import io.icw.api.db.*;
+import io.icw.api.exception.JsonRpcException;
 import io.icw.api.manager.CacheManager;
 import io.icw.api.model.po.*;
 import io.icw.api.model.rpc.*;
@@ -40,6 +41,7 @@ import io.icw.core.basic.Result;
 import io.icw.core.core.annotation.Autowired;
 import io.icw.core.core.annotation.Controller;
 import io.icw.core.core.annotation.RpcMethod;
+import io.icw.core.log.Log;
 import io.icw.core.model.StringUtils;
 import io.icw.core.parse.MapUtils;
 
@@ -72,6 +74,9 @@ public class AccountController {
 
     @Autowired
     TokenService tokenService;
+
+    @Autowired
+    private TransactionService txService;
 
     @RpcMethod("getAccountList")
     public RpcResult getAccountList(List<Object> params) {
@@ -267,6 +272,25 @@ public class AccountController {
                     if (assetInfo != null) {
                         res.put("symbol", assetInfo.getSymbol());
                         res.put("decimals", assetInfo.getDecimals());
+                    }
+                   
+                    try { 
+	                    Result<TransactionInfo> transactionInfoResult = WalletRpcHandler.getTx(chainId, d.getTxHash());
+	                    TransactionInfo transactionInfo = transactionInfoResult.getData();
+	                    
+	                    if (transactionInfo != null) {
+		                    if (transactionInfo.getCoinFroms() != null && !transactionInfo.getCoinFroms().isEmpty()) {
+		                    	res.put("fromAddress", transactionInfo.getCoinFroms().get(0).getAddress());
+		                    } else {
+		                    	res.put("fromAddress", "");
+		                    }
+		                    if (transactionInfo.getCoinTos() != null && !transactionInfo.getCoinTos().isEmpty()) {
+		                    	res.put("toAddress", transactionInfo.getCoinTos().get(0).getAddress());
+		                    } else {
+		                    	res.put("toAddress", "");
+		                    }
+	                    }
+                    } catch (Exception e) {
                     }
                     return res;
                 }).collect(Collectors.toList())));
